@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import socket
 import sys
 
 from . import sonos_client
@@ -26,12 +27,33 @@ def _setup_logging(verbose: bool) -> None:
     )
 
 
+def _lan_ip() -> str:
+    """このホストの LAN IP を推定する（スマホからのアクセス URL 表示用）。"""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))  # 実際には送信しない。ルーティング先IPを得るだけ。
+        return s.getsockname()[0]
+    except OSError:
+        return "127.0.0.1"
+    finally:
+        s.close()
+
+
 def _cmd_serve(args: argparse.Namespace) -> int:
     store = Store(args.data)
     runner = ScheduleRunner(store)
     runner.start()
     app = create_app(store, runner)
-    print(f"Web UI: http://{args.host}:{args.port}  (Ctrl+C で終了)")
+    if args.host == "0.0.0.0":
+        print("=" * 52)
+        print("  Sonos 睡眠 BGM を起動しました (Ctrl+C で終了)")
+        print(f"  このPC:   http://127.0.0.1:{args.port}")
+        print(f"  スマホ:   http://{_lan_ip()}:{args.port}")
+        print("    → スマホのブラウザで上記を開き、")
+        print("      『ホーム画面に追加』でアプリとして使えます。")
+        print("=" * 52)
+    else:
+        print(f"Web UI: http://{args.host}:{args.port}  (Ctrl+C で終了)")
     try:
         # スケジューラは別スレッドなので reloader は無効にする。
         app.run(host=args.host, port=args.port, use_reloader=False)
@@ -73,7 +95,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_serve = sub.add_parser("serve", help="Web UI + スケジューラを起動する")
-    p_serve.add_argument("--host", default="127.0.0.1")
+    # スマホからアプリとして使えるよう、既定で LAN に公開する。
+    p_serve.add_argument("--host", default="0.0.0.0")
     p_serve.add_argument("--port", type=int, default=8765)
     p_serve.set_defaults(func=_cmd_serve)
 

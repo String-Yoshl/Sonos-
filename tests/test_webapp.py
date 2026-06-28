@@ -91,3 +91,32 @@ def test_update_missing_returns_404(client):
     c, _ = client
     res = c.put("/api/schedules/nope", json=_payload())
     assert res.status_code == 404
+
+
+def test_index_has_pwa_tags(client):
+    c, _ = client
+    html = c.get("/").get_data(as_text=True)
+    assert 'rel="manifest"' in html
+    assert "apple-mobile-web-app-capable" in html
+    assert "apple-touch-icon" in html
+
+
+def test_manifest_served_with_mime(client):
+    c, _ = client
+    res = c.get("/manifest.webmanifest")
+    assert res.status_code == 200
+    assert "manifest+json" in res.headers["Content-Type"]
+    assert res.get_json()["display"] == "standalone"
+
+
+def test_service_worker_scope_header(client):
+    c, _ = client
+    res = c.get("/sw.js")
+    assert res.status_code == 200
+    assert res.headers.get("Service-Worker-Allowed") == "/"
+
+
+def test_icons_served(client):
+    c, _ = client
+    assert c.get("/icons/icon-192.png").status_code == 200
+    assert c.get("/icons/apple-touch-icon.png").status_code == 200

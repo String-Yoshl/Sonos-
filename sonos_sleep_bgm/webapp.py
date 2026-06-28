@@ -45,10 +45,29 @@ def create_app(store: Store, runner: ScheduleRunner | None = None) -> Flask:
     def next_runs() -> dict:
         return runner.next_run_times() if runner is not None else {}
 
-    # ---- UI -------------------------------------------------------------
+    # ---- UI / PWA -------------------------------------------------------
     @app.get("/")
     def index():
         return send_from_directory(app.static_folder, "index.html")
+
+    @app.get("/manifest.webmanifest")
+    def manifest():
+        # Flask は .webmanifest の MIME を知らないため明示する。
+        return send_from_directory(
+            app.static_folder,
+            "manifest.webmanifest",
+            mimetype="application/manifest+json",
+        )
+
+    @app.get("/sw.js")
+    def service_worker():
+        # ルートスコープを許可してサイト全体を制御できるようにする。
+        resp = send_from_directory(
+            app.static_folder, "sw.js", mimetype="text/javascript"
+        )
+        resp.headers["Service-Worker-Allowed"] = "/"
+        resp.headers["Cache-Control"] = "no-cache"
+        return resp
 
     # ---- 部屋・設定 -----------------------------------------------------
     @app.get("/api/rooms")

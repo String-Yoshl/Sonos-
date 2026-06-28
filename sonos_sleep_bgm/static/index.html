@@ -2,8 +2,19 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Sonos 睡眠 BGM</title>
+
+  <!-- PWA: ホーム画面に追加してアプリのように起動する -->
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#0e1014" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <!-- iOS: 全画面のスタンドアロン表示 -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="睡眠BGM" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -93,6 +104,15 @@
 
   <div id="toast" class="toast hidden"></div>
 
+  <script>
+    // Service Worker はセキュアコンテキスト(localhost / HTTPS)でのみ登録できる。
+    // LAN の HTTP 越しでも「ホーム画面に追加」でアプリ起動は可能なので、登録は任意。
+    if ("serviceWorker" in navigator && window.isSecureContext) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("sw.js").catch(() => {});
+      });
+    }
+  </script>
   <script src="app.js"></script>
 </body>
 </html>

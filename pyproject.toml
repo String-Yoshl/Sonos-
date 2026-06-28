@@ -21,7 +21,7 @@ sonos-sleep-bgm = "sonos_sleep_bgm.cli:main"
 packages = ["sonos_sleep_bgm"]
 
 [tool.setuptools.package-data]
-sonos_sleep_bgm = ["static/*"]
+sonos_sleep_bgm = ["static/*", "static/icons/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

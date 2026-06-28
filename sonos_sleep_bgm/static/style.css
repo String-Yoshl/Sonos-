@@ -108,3 +108,28 @@ select, input[type=text], input[type=time], input[type=number] {
 
 .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #222a36; border: 1px solid var(--line); padding: 12px 18px; border-radius: 10px; z-index: 30; }
 .toast.err { border-color: #4a2730; color: var(--danger); }
+
+/* スタンドアロン起動時はノッチ/ホームインジケータを避ける */
+body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+
+/* スマホ向けレイアウト */
+@media (max-width: 560px) {
+  .topbar { flex-direction: column; align-items: stretch; gap: 10px; }
+  .room-picker { justify-content: space-between; }
+  .room-picker select { flex: 1; }
+  main { padding: 14px; }
+  .panel { padding: 14px; border-radius: 12px; }
+  .panel-head { flex-direction: column; align-items: stretch; gap: 10px; }
+  .panel-head .primary { width: 100%; }
+  /* カードを縦積みにして指で押しやすく */
+  .card { grid-template-columns: 1fr; gap: 8px; }
+  .card .time { font-size: 2rem; }
+  .card .actions { justify-content: space-between; }
+  .card .actions button { flex: 1; }
+  .modal { padding: 0; align-items: stretch; }
+  .modal-box { max-width: none; min-height: 100%; border-radius: 0; }
+  .row > label { min-width: 100%; }
+  /* タップターゲットを大きく */
+  button { padding: 11px 14px; }
+  select, input[type=text], input[type=time], input[type=number] { padding: 11px 12px; font-size: 16px; }
+}
