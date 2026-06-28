@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sonos 睡眠 BGM</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">🎵 Sonos 睡眠 BGM</div>
+    <div class="room-picker">
+      <label for="room">再生する部屋</label>
+      <select id="room"></select>
+      <button id="refresh-rooms" class="ghost" title="部屋を再検出">⟳</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <div class="panel-head">
+        <h2>スケジュール（時刻 × BGM）</h2>
+        <button id="add-schedule" class="primary">＋ 新しいセット</button>
+      </div>
+      <div id="schedules" class="cards"></div>
+      <p id="empty" class="empty hidden">まだセットがありません。「＋ 新しいセット」から追加してください。</p>
+    </section>
+  </main>
+
+  <!-- スケジュール編集モーダル -->
+  <div id="modal" class="modal hidden">
+    <div class="modal-box">
+      <h3 id="modal-title">新しいセット</h3>
+      <form id="schedule-form">
+        <input type="hidden" id="f-id" />
+
+        <label>セット名
+          <input type="text" id="f-name" placeholder="例: 夜の睡眠BGM" required />
+        </label>
+
+        <div class="row">
+          <label>再生開始時刻
+            <input type="time" id="f-time" value="21:00" required />
+          </label>
+          <label>スリープタイマー
+            <select id="f-sleep">
+              <option value="">無効</option>
+              <option value="15">15分</option>
+              <option value="30">30分</option>
+              <option value="45">45分</option>
+              <option value="60" selected>60分（既定）</option>
+              <option value="90">90分</option>
+              <option value="120">120分</option>
+              <option value="custom">その他…</option>
+            </select>
+          </label>
+          <label id="sleep-custom-wrap" class="hidden">任意（分）
+            <input type="number" id="f-sleep-custom" min="1" placeholder="分" />
+          </label>
+        </div>
+
+        <div class="source-block">
+          <div class="source-head">
+            <span>BGM（プレイリスト / お気に入り）</span>
+            <span id="selected-source" class="selected-source">未選択</span>
+          </div>
+          <input type="text" id="source-search" placeholder="🔍 プレイリストを検索…" />
+          <div id="source-list" class="source-list"></div>
+          <p id="source-hint" class="hint"></p>
+        </div>
+
+        <div class="row">
+          <label>音量: <span id="vol-label">18</span>
+            <input type="range" id="f-volume" min="0" max="100" value="18" />
+          </label>
+          <label>フェードイン（秒）
+            <input type="number" id="f-fade" min="0" value="30" />
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" id="f-enabled" checked /> 有効
+          </label>
+        </div>
+
+        <p id="form-error" class="error hidden"></p>
+
+        <div class="modal-actions">
+          <button type="button" id="cancel" class="ghost">キャンセル</button>
+          <button type="submit" class="primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

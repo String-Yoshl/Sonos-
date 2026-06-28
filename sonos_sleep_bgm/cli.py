@@ -1,10 +1,9 @@
 """コマンドラインインターフェース。
 
 使い方:
-    python -m sonos_sleep_bgm.cli run          # 常駐してスケジュール再生
-    python -m sonos_sleep_bgm.cli play-now     # その場で 1 回再生 (動作確認用)
-    python -m sonos_sleep_bgm.cli list-rooms   # 検出できた部屋を一覧表示
-    python -m sonos_sleep_bgm.cli list-favorites  # お気に入りを一覧表示
+    python -m sonos_sleep_bgm.cli serve         # Web UI + スケジューラを起動
+    python -m sonos_sleep_bgm.cli list-rooms    # 検出できた部屋を表示
+    python -m sonos_sleep_bgm.cli play-now <schedule-id>  # 指定セットを即再生
 """
 
 from __future__ import annotations
@@ -12,13 +11,11 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
-from pathlib import Path
 
-from .config import Config
-from .player import PlayerError, find_room, play_sleep_bgm
-from .scheduler import run_forever
-
-DEFAULT_CONFIG = "config.yaml"
+from . import sonos_client
+from .scheduler import ScheduleRunner
+from .store import DEFAULT_DATA_PATH, Store
+from .webapp import create_app
 
 
 def _setup_logging(verbose: bool) -> None:
@@ -29,74 +26,63 @@ def _setup_logging(verbose: bool) -> None:
     )
 
 
-def _load_config(path: str) -> Config:
-    return Config.from_file(path)
-
-
-def _cmd_run(args: argparse.Namespace) -> int:
-    config = _load_config(args.config)
-    run_forever(config)
-    return 0
-
-
-def _cmd_play_now(args: argparse.Namespace) -> int:
-    config = _load_config(args.config)
-    play_sleep_bgm(config)
+def _cmd_serve(args: argparse.Namespace) -> int:
+    store = Store(args.data)
+    runner = ScheduleRunner(store)
+    runner.start()
+    app = create_app(store, runner)
+    print(f"Web UI: http://{args.host}:{args.port}  (Ctrl+C で終了)")
+    try:
+        # スケジューラは別スレッドなので reloader は無効にする。
+        app.run(host=args.host, port=args.port, use_reloader=False)
+    finally:
+        runner.shutdown()
     return 0
 
 
 def _cmd_list_rooms(args: argparse.Namespace) -> int:
-    import soco
-
-    zones = soco.discover() or set()
-    if not zones:
-        print("Sonos デバイスが見つかりませんでした。同じネットワークにいるか確認してください。")
+    rooms = sonos_client.list_rooms()
+    if not rooms:
+        print("Sonos が見つかりませんでした。同一ネットワークか確認してください。")
         return 1
     print("検出できた部屋:")
-    for zone in sorted(zones, key=lambda z: z.player_name):
-        print(f"  - {zone.player_name} ({zone.ip_address})")
+    for r in rooms:
+        print(f"  - {r['name']} ({r['ip']})")
     return 0
 
 
-def _cmd_list_favorites(args: argparse.Namespace) -> int:
-    config = _load_config(args.config)
-    device = find_room(config.room)
-    favorites = device.music_library.get_sonos_favorites()
-    if not favorites:
-        print("お気に入りが登録されていません。")
-        return 0
-    print(f"'{config.room}' から見えるお気に入り:")
-    for fav in favorites:
-        print(f"  - {fav.title}")
+def _cmd_play_now(args: argparse.Namespace) -> int:
+    store = Store(args.data)
+    schedule = store.get_schedule(args.schedule_id)
+    if schedule is None:
+        print(f"スケジュール '{args.schedule_id}' が見つかりません。", file=sys.stderr)
+        return 2
+    sonos_client.play_schedule(store.get_settings().room, schedule)
     return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="sonos-sleep-bgm",
-        description="主書斎の Sonos から毎日睡眠 BGM を再生する自分用アプリ。",
+        description="主書斎の Sonos で時刻×BGM のセットを管理・自動再生する自分用アプリ。",
     )
     parser.add_argument(
-        "-c",
-        "--config",
-        default=DEFAULT_CONFIG,
-        help=f"設定ファイルのパス (既定: {DEFAULT_CONFIG})",
+        "-d", "--data", default=str(DEFAULT_DATA_PATH), help="データファイルのパス"
     )
-    parser.add_argument("-v", "--verbose", action="store_true", help="詳細ログを出力する")
-
+    parser.add_argument("-v", "--verbose", action="store_true", help="詳細ログ")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p_run = sub.add_parser("run", help="常駐してスケジュール通りに再生する")
-    p_run.set_defaults(func=_cmd_run)
+    p_serve = sub.add_parser("serve", help="Web UI + スケジューラを起動する")
+    p_serve.add_argument("--host", default="127.0.0.1")
+    p_serve.add_argument("--port", type=int, default=8765)
+    p_serve.set_defaults(func=_cmd_serve)
 
-    p_play = sub.add_parser("play-now", help="今すぐ 1 回再生する (動作確認用)")
-    p_play.set_defaults(func=_cmd_play_now)
-
-    p_rooms = sub.add_parser("list-rooms", help="検出できた部屋を一覧表示する")
+    p_rooms = sub.add_parser("list-rooms", help="検出できた部屋を表示する")
     p_rooms.set_defaults(func=_cmd_list_rooms)
 
-    p_favs = sub.add_parser("list-favorites", help="お気に入りを一覧表示する")
-    p_favs.set_defaults(func=_cmd_list_favorites)
+    p_play = sub.add_parser("play-now", help="指定セットを今すぐ再生する")
+    p_play.add_argument("schedule_id")
+    p_play.set_defaults(func=_cmd_play_now)
 
     return parser
 
@@ -105,14 +91,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     _setup_logging(args.verbose)
-
     try:
         return args.func(args)
-    except (FileNotFoundError, ValueError) as exc:
-        print(f"設定エラー: {exc}", file=sys.stderr)
-        return 2
-    except PlayerError as exc:
-        print(f"再生エラー: {exc}", file=sys.stderr)
+    except sonos_client.SonosError as exc:
+        print(f"Sonos エラー: {exc}", file=sys.stderr)
         return 1
 
 

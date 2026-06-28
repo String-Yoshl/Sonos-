@@ -11,7 +11,7 @@ requires-python = ">=3.10"
 dependencies = [
     "soco>=0.30",
     "APScheduler>=3.10,<4",
-    "PyYAML>=6.0",
+    "Flask>=3.0",
 ]
 
 [project.scripts]
@@ -19,6 +19,9 @@ sonos-sleep-bgm = "sonos_sleep_bgm.cli:main"
 
 [tool.setuptools]
 packages = ["sonos_sleep_bgm"]
+
+[tool.setuptools.package-data]
+sonos_sleep_bgm = ["static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

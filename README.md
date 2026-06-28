@@ -1,73 +1,75 @@
 # sonos-sleep-bgm
 
-主書斎の **Sonos** から、**毎日決まった時刻に指定した睡眠 BGM を自動再生**する自分用アプリです。
-Sonos のローカル制御 API（[SoCo](https://github.com/SoCo/SoCo)）を使うので、同じ LAN にいれば
-クラウドのアカウント連携なしで動きます。
+主書斎の **Sonos** で、**Sonos アプリのような UI** からプレイリスト／お気に入りを
+閲覧・検索して BGM を選び、**「時刻 × BGM」のセットを複数ストック**して、
+**毎日決まった時刻に自動再生**する自分用アプリです。
+Sonos のローカル制御 API（[SoCo](https://github.com/SoCo/SoCo)）を使うので、
+同じ LAN にいればクラウドのアカウント連携なしで動きます。
 
-## 仕組み
+## できること
 
-- `SoCo` で部屋名（例: `主書斎`）から Sonos スピーカーを特定して再生する
-- 音源は **Sonos のお気に入り名** か **直接 URI** のどちらでも指定できる
-- `APScheduler` の cron トリガーで、毎日 `schedule_time` に再生ジョブを起動する
-- 常駐プロセス（`run`）として動かす。1 回の再生失敗ではプロセスは落ちない
+- 🎚️ **Sonos アプリ風の Web UI** … プレイリスト／お気に入りを**一覧・検索**して選択。選んだ設定はファイルに保存され、**変更するまで有効**。
+- 🕘 **時刻は任意設定** … 各セットごとに `HH:MM` を自由に指定。
+- 🗂️ **セットを複数ストック** … 「夜は環境音、朝はジャズ」のように「時刻 + BGM」のセットをいくつでも登録でき、個別に有効/無効を切り替え可能。
+- 😴 **スリープタイマー** … 既定 60 分。無効や任意の分数（15/30/45/60/90/120/その他）に変更可。Sonos ネイティブのスリープタイマーを使うので、指定時間で自動停止。
+- 🔊 音量・フェードインも各セットで設定。「▶ 今すぐ再生」で動作確認もできる。
+
+## 構成
+
+| モジュール | 役割 |
+| --- | --- |
+| `models.py` | データモデル（設定・スケジュール・音源）とバリデーション |
+| `store.py` | JSON ファイルへの永続化（再起動後も設定を保持） |
+| `sonos_client.py` | SoCo ラッパー：部屋検出・音源一覧/検索・再生・スリープタイマー |
+| `scheduler.py` | APScheduler で複数スケジュールを管理（設定変更時に再同期） |
+| `webapp.py` | Flask の REST API ＋ UI 配信 |
+| `static/` | Sonos アプリ風のフロントエンド（HTML/CSS/JS） |
+| `cli.py` | `serve` / `list-rooms` / `play-now` |
 
 ## セットアップ
 
 ```bash
-# 依存をインストール（仮想環境推奨）
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-
-# 設定ファイルを用意して編集する
-cp config.example.yaml config.yaml
 ```
-
-`config.yaml` の主な項目:
-
-| キー | 説明 |
-| --- | --- |
-| `room` | Sonos アプリ上の部屋名。例 `主書斎` |
-| `schedule_time` | 毎日の再生開始時刻 `HH:MM`（24時間表記）。睡眠 BGM なので既定は `21:00` |
-| `bgm_favorite` | 再生する Sonos お気に入りの名前（推奨） |
-| `bgm_uri` | お気に入りの代わりに直接指定する音源 URI |
-| `volume` | 再生音量 0〜100（`null` で変更しない） |
-| `fade_in_seconds` | 目標音量までフェードインする秒数（0 で即時） |
-| `timezone` | スケジューラのタイムゾーン。例 `Asia/Tokyo` |
-
-> ⏰ **9 時について**: 睡眠 BGM なので既定は夜 9 時（`21:00`）にしています。
-> 朝 9 時にしたい場合は `schedule_time: "09:00"` に変更してください。
 
 ## 使い方
 
 ```bash
-# まず部屋名を確認（Sonos が検出できるか確認できる）
+# 部屋が検出できるか確認（任意）
 python -m sonos_sleep_bgm.cli list-rooms
 
-# お気に入り名を確認
-python -m sonos_sleep_bgm.cli list-favorites
-
-# その場で 1 回再生して動作確認
-python -m sonos_sleep_bgm.cli play-now
-
-# 常駐してスケジュール通りに毎日再生する
-python -m sonos_sleep_bgm.cli run
+# Web UI + スケジューラを起動
+python -m sonos_sleep_bgm.cli serve
+#  → ブラウザで http://127.0.0.1:8765 を開く
 ```
 
-`pip install -e .` でインストールすると `sonos-sleep-bgm` コマンドとしても使えます。
+ブラウザでの操作:
+
+1. 右上の**「再生する部屋」**で `主書斎` を選ぶ（自動保存）。
+2. **「＋ 新しいセット」**をクリック。
+3. 名前・**再生開始時刻**・**スリープタイマー**を設定。
+4. 検索ボックスでプレイリスト／お気に入りを探して選択。
+5. 音量・フェードインを調整して**保存**。
+6. カードの **▶** で即時再生テスト、トグルで有効/無効、✎ で編集、🗑 で削除。
+
+データは `data/app_data.json` に保存され、**変更するまで有効**です。
+
+> `serve` の `--host 0.0.0.0` で同一 LAN の他端末（スマホ等）からも操作できます。
 
 ## 常時起動（おすすめ: systemd）
 
-PC や Raspberry Pi で常駐させる例（`/etc/systemd/system/sonos-sleep-bgm.service`）:
+`/etc/systemd/system/sonos-sleep-bgm.service`:
 
 ```ini
 [Unit]
-Description=Sonos Sleep BGM Scheduler
+Description=Sonos Sleep BGM
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 WorkingDirectory=/home/youruser/sonos-sleep-bgm
-ExecStart=/home/youruser/sonos-sleep-bgm/.venv/bin/python -m sonos_sleep_bgm.cli run
+ExecStart=/home/youruser/sonos-sleep-bgm/.venv/bin/python -m sonos_sleep_bgm.cli serve --host 0.0.0.0
 Restart=on-failure
 User=youruser
 
@@ -77,7 +79,7 @@ WantedBy=multi-user.target
 
 ```bash
 sudo systemctl enable --now sonos-sleep-bgm
-journalctl -u sonos-sleep-bgm -f   # ログ確認
+journalctl -u sonos-sleep-bgm -f
 ```
 
 ## テスト
@@ -91,5 +93,5 @@ Sonos 実機がなくても通るよう、再生まわりはモックでテス�
 
 ## 注意
 
-- アプリを動かす機器は Sonos と **同じネットワーク**（同一サブネット）にいる必要があります。
-- `config.yaml`（音源 URL やお気に入り名）は `.gitignore` 済みでコミットされません。
+- アプリを動かす機器は Sonos と**同じネットワーク**（同一サブネット）にいる必要があります。
+- `data/`（保存した設定）は `.gitignore` 済みでコミットされません。
