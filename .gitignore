@@ -1,0 +1,14 @@
+# 個人設定（音源URLやお気に入り名など）はコミットしない
+config.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/

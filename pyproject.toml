@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sonos-sleep-bgm"
+version = "0.1.0"
+description = "主書斎の Sonos から毎日睡眠 BGM を再生する自分用アプリ"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "soco>=0.30",
+    "APScheduler>=3.10,<4",
+    "PyYAML>=6.0",
+]
+
+[project.scripts]
+sonos-sleep-bgm = "sonos_sleep_bgm.cli:main"
+
+[tool.setuptools]
+packages = ["sonos_sleep_bgm"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
