@@ -1,8 +1,8 @@
-# Sonos 睡眠 BGM ワンコマンドインストーラ (Windows / PowerShell)
+﻿# Sonos 睡眠 BGM ワンコマンドインストーラ (Windows / PowerShell)
 #
-#   右クリック →「PowerShell で実行」または:
-#     powershell -ExecutionPolicy Bypass -File install.ps1
-#   セットアップのみ:  install.ps1 setup
+#   実行方法 (このファイルのあるフォルダで):
+#     powershell -ExecutionPolicy Bypass -File .\install.ps1
+#   セットアップのみ:  .\install.ps1 setup
 #
 $ErrorActionPreference = "Stop"
 Set-Location -Path $PSScriptRoot
