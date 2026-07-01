@@ -64,7 +64,7 @@ Sonos のローカル制御 API（[SoCo](https://github.com/SoCo/SoCo)）を使�
 **かんたん（推奨）** — ワンコマンドで依存インストール＋起動：
 
 ```bash
-./install.sh            # macOS / Linux / Raspberry Pi
+bash install.sh         # macOS / Linux / Raspberry Pi
 # Windows:  powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 

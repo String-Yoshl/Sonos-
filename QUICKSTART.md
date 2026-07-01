@@ -10,7 +10,7 @@
 
 **macOS / Linux / Raspberry Pi**
 ```bash
-./install.sh
+bash install.sh      # ./install.sh でも可(実行権限があれば)
 ```
 
 **Windows（PowerShell）**
