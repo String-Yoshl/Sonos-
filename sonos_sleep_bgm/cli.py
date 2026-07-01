@@ -40,6 +40,19 @@ def _lan_ip() -> str:
         s.close()
 
 
+def _print_qr(url: str) -> None:
+    """スマホのカメラで読めるよう、URL の QR コードをターミナルに表示する。"""
+    try:
+        import qrcode
+    except ImportError:
+        print("  (QR 表示には `pip install qrcode` が必要です)")
+        return
+    qr = qrcode.QRCode(border=1)
+    qr.add_data(url)
+    qr.make(fit=True)
+    qr.print_ascii(invert=True)
+
+
 def _cmd_serve(args: argparse.Namespace) -> int:
     store = Store(args.data)
     # LAN 内の第三者による操作を防ぐため、API はトークン認証必須にする。
@@ -48,12 +61,17 @@ def _cmd_serve(args: argparse.Namespace) -> int:
     runner.start()
     app = create_app(store, runner, auth_token=token)
     if args.host == "0.0.0.0":
+        phone_url = f"http://{_lan_ip()}:{args.port}/?token={token}"
         print("=" * 60)
         print("  Sonos 睡眠 BGM を起動しました (Ctrl+C で終了)")
         print(f"  このPC:   http://127.0.0.1:{args.port}/?token={token}")
-        print(f"  スマホ:   http://{_lan_ip()}:{args.port}/?token={token}")
-        print("    → スマホのブラウザで上記を開き、")
-        print("      『ホーム画面に追加』でアプリとして使えます。")
+        print(f"  スマホ:   {phone_url}")
+        print("=" * 60)
+        if not args.no_qr:
+            print("  ▼ スマホのカメラでこの QR を読み取ってください")
+            print("    (開いたら共有 →「ホーム画面に追加」でアプリ完成)")
+            print()
+            _print_qr(phone_url)
         print(f"  アクセストークン: {token}")
         print("    (data/auth_token に保存。URL で一度開けば端末に記憶されます)")
         print("=" * 60)
@@ -109,6 +127,9 @@ def build_parser() -> argparse.ArgumentParser:
         "--token",
         default=None,
         help="アクセストークンを明示指定する(省略時は data/auth_token を自動生成・再利用)",
+    )
+    p_serve.add_argument(
+        "--no-qr", action="store_true", help="起動時の QR コード表示を無効にする"
     )
     p_serve.set_defaults(func=_cmd_serve)
 

@@ -61,6 +61,18 @@ Sonos のローカル制御 API（[SoCo](https://github.com/SoCo/SoCo)）を使�
 
 ## セットアップ
 
+**かんたん（推奨）** — ワンコマンドで依存インストール＋起動：
+
+```bash
+./install.sh            # macOS / Linux / Raspberry Pi
+# Windows:  powershell -ExecutionPolicy Bypass -File install.ps1
+```
+
+起動するとスマホ用 URL と **QR コード**が表示されます。スマホのカメラで読み取り、
+「ホーム画面に追加」すればアプリ完成です（→ 手順は [QUICKSTART.md](QUICKSTART.md)）。
+
+**手動セットアップ**：
+
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
