@@ -93,14 +93,44 @@ select, input[type=text], input[type=time], input[type=number] {
 .row { display: flex; gap: 14px; flex-wrap: wrap; }
 .row > label { flex: 1; min-width: 120px; }
 
-.source-block { border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
-.source-head { display: flex; justify-content: space-between; align-items: center; font-size: .85rem; color: var(--muted); }
-.selected-source { color: var(--accent-2); font-weight: 600; }
-.source-list { max-height: 220px; overflow: auto; display: flex; flex-direction: column; gap: 4px; }
-.source-item { display: flex; justify-content: space-between; align-items: center; padding: 9px 11px; border-radius: 8px; background: #11141a; border: 1px solid transparent; cursor: pointer; }
+/* フィールド（ラベル + コントロール） */
+.field { display: flex; flex-direction: column; gap: 8px; }
+.field-label { font-size: .85rem; color: var(--muted); }
+
+/* BGM 選択ボタン（タップでピッカーを開く） */
+.pick-btn {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 15px 14px; background: #11141a; border: 1px solid var(--line);
+  border-radius: 12px; color: var(--muted); font-size: 1rem; text-align: left;
+}
+.pick-btn .pick-icon { font-size: 1.15rem; }
+.pick-btn #pick-source-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick-btn .chev { color: var(--muted); font-size: 1.4rem; line-height: 1; }
+.pick-btn.picked { color: var(--accent-2); border-color: var(--accent); font-weight: 600; }
+
+/* チップボタン（スリープタイマー等） */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  padding: 10px 15px; border-radius: 999px; background: #11141a;
+  border: 1px solid var(--line); color: var(--text); font-size: .9rem;
+}
+.chip.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+
+/* BGM ピッカー */
+.picker-box { display: flex; flex-direction: column; gap: 12px; }
+.picker-head { display: flex; align-items: center; gap: 10px; }
+.picker-head h3 { margin: 0; }
+.source-list { max-height: 55vh; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
+.source-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 14px 13px; border-radius: 10px; background: #11141a;
+  border: 1px solid transparent; cursor: pointer; text-align: left;
+  color: var(--text); font-size: 1rem;
+}
 .source-item:hover { border-color: var(--line); }
 .source-item.selected { border-color: var(--accent); background: #16243d; }
-.source-item .s-title { font-weight: 500; color: var(--text); }
+.source-item .s-icon { font-size: 1.1rem; }
+.source-item .s-title { flex: 1; min-width: 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hint { color: var(--muted); font-size: .8rem; margin: 0; }
 
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
@@ -129,6 +159,9 @@ body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-are
   .modal { padding: 0; align-items: stretch; }
   .modal-box { max-width: none; min-height: 100%; border-radius: 0; }
   .row > label { min-width: 100%; }
+  /* ピッカーは全画面でリストを伸ばす */
+  .source-list { max-height: none; flex: 1; }
+  .chip { padding: 12px 16px; }
   /* タップターゲットを大きく */
   button { padding: 11px 14px; }
   select, input[type=text], input[type=time], input[type=number] { padding: 11px 12px; font-size: 16px; }

@@ -37,7 +37,9 @@ def list_rooms() -> list[dict]:
 def find_room(room: str) -> SoCo:
     """部屋名から Sonos デバイスを取得する。見つからなければ SonosError。"""
     if not room:
-        raise SonosError("部屋（room）が設定されていません。設定画面で選んでください。")
+        raise SonosError(
+            "再生する部屋が未設定です。画面上部の「再生する部屋」から選んでください。"
+        )
     device = soco.discovery.by_name(room)
     if device is None:
         available = [r["name"] for r in list_rooms()]

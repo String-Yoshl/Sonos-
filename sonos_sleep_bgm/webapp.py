@@ -124,8 +124,9 @@ def create_app(
         data = request.get_json(silent=True) or {}
         try:
             settings = store.update_settings(
-                room=data.get("room"),
-                timezone=data.get("timezone"),
+                # 空文字は「未指定」と同義に扱い、設定済みの部屋を誤って消さない。
+                room=data.get("room") or None,
+                timezone=data.get("timezone") or None,
             )
         except ValueError as exc:
             return jsonify(error=str(exc)), 400

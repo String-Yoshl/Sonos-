@@ -59,33 +59,56 @@ function toast(msg, isErr) {
 }
 
 // ---- 部屋 -----------------------------------------------------------
+async function saveRoom(name) {
+  await api("/api/settings", { method: "PUT", body: JSON.stringify({ room: name }) });
+}
+
 async function loadRooms() {
   const sel = $("#room");
   let rooms = [];
   try { rooms = await api("/api/rooms"); } catch (e) { toast(e.message, true); }
   const settings = await api("/api/settings");
+  const names = rooms.map((r) => r.name);
+
+  // 部屋が未設定で 1 部屋だけ見つかった場合は自動設定する（迷わせない）。
+  if (!settings.room && names.length === 1) {
+    try {
+      await saveRoom(names[0]);
+      settings.room = names[0];
+      toast(`再生する部屋を「${names[0]}」に設定しました。`);
+    } catch (e) { /* 失敗時は手動選択にフォールバック */ }
+  }
+
+  // 保存済みの部屋が検出に出てこない場合も選べるようにしておく。
+  if (settings.room && !names.includes(settings.room)) names.unshift(settings.room);
+
   sel.innerHTML = "";
-  if (!rooms.length) {
+  if (!settings.room) {
+    // 「見た目は選ばれているのに保存されていない」事故を防ぐため、
+    // 未設定のときは必ずプレースホルダを選択状態にする。
     const o = document.createElement("option");
-    o.textContent = "（部屋が見つかりません）";
     o.value = "";
+    o.textContent = names.length ? "▼ 部屋を選んでください" : "（部屋が見つかりません）";
+    o.selected = true;
+    o.disabled = names.length > 0;
     sel.appendChild(o);
   }
-  // 保存済みの部屋が検出に出てこない場合も選べるようにしておく。
-  const names = rooms.map((r) => r.name);
-  if (settings.room && !names.includes(settings.room)) names.unshift(settings.room);
   names.forEach((name) => {
     const o = document.createElement("option");
     o.value = name; o.textContent = name;
     if (name === settings.room) o.selected = true;
     sel.appendChild(o);
   });
+  if (!settings.room && names.length > 1) {
+    toast("画面上部で再生する部屋を選んでください。", true);
+  }
 }
 
 $("#room").addEventListener("change", async (e) => {
+  if (!e.target.value) return; // プレースホルダは無視（空文字で上書きしない）
   try {
-    await api("/api/settings", { method: "PUT", body: JSON.stringify({ room: e.target.value }) });
-    toast("部屋を保存しました。");
+    await saveRoom(e.target.value);
+    toast(`部屋を「${e.target.value}」に設定しました。`);
   } catch (err) { toast(err.message, true); }
 });
 $("#refresh-rooms").addEventListener("click", loadRooms);
@@ -157,6 +180,25 @@ async function toggleSchedule(s, enabled) {
   catch (e) { toast(e.message, true); await loadSchedules(); }
 }
 
+// ---- スリープタイマー(チップボタン) ---------------------------------
+function setSleepChip(val) {
+  document.querySelectorAll("#sleep-chips .chip").forEach((c) => {
+    c.classList.toggle("active", c.dataset.val === val);
+  });
+  $("#f-sleep-custom").classList.toggle("hidden", val !== "custom");
+  if (val === "custom") $("#f-sleep-custom").focus();
+}
+
+function currentSleepChip() {
+  const active = document.querySelector("#sleep-chips .chip.active");
+  return active ? active.dataset.val : "60";
+}
+
+$("#sleep-chips").addEventListener("click", (e) => {
+  const chip = e.target.closest(".chip");
+  if (chip) setSleepChip(chip.dataset.val);
+});
+
 // ---- モーダル -------------------------------------------------------
 function openModal(s) {
   $("#modal-title").textContent = s ? "セットを編集" : "新しいセット";
@@ -169,37 +211,48 @@ function openModal(s) {
   $("#f-enabled").checked = s ? s.enabled : true;
 
   // スリープタイマー
-  const sleepSel = $("#f-sleep");
   const min = s ? s.sleep_timer_minutes : 60;
   const preset = ["", "15", "30", "45", "60", "90", "120"];
-  if (min == null) sleepSel.value = "";
-  else if (preset.includes(String(min))) sleepSel.value = String(min);
-  else { sleepSel.value = "custom"; $("#f-sleep-custom").value = min; }
-  updateSleepCustom();
+  if (min == null) setSleepChip("");
+  else if (preset.includes(String(min))) setSleepChip(String(min));
+  else { setSleepChip("custom"); $("#f-sleep-custom").value = min; }
 
   selectedSource = s ? { ...s.source } : null;
   renderSelectedSource();
-  $("#source-search").value = "";
   $("#form-error").classList.add("hidden");
   $("#modal").classList.remove("hidden");
-  loadSources("");
 }
 
 function closeModal() { $("#modal").classList.add("hidden"); }
 
 function renderSelectedSource() {
-  $("#selected-source").textContent = selectedSource ? selectedSource.title || selectedSource.uri : "未選択";
+  const label = $("#pick-source-label");
+  const btn = $("#pick-source");
+  if (selectedSource) {
+    label.textContent = selectedSource.title || selectedSource.uri;
+    btn.classList.add("picked");
+  } else {
+    label.textContent = "タップして選ぶ";
+    btn.classList.remove("picked");
+  }
 }
 
-function updateSleepCustom() {
-  $("#sleep-custom-wrap").classList.toggle("hidden", $("#f-sleep").value !== "custom");
-}
-
-$("#f-sleep").addEventListener("change", updateSleepCustom);
 $("#f-volume").addEventListener("input", (e) => { $("#vol-label").textContent = e.target.value; });
 $("#add-schedule").addEventListener("click", () => openModal(null));
 $("#cancel").addEventListener("click", closeModal);
 $("#modal").addEventListener("click", (e) => { if (e.target.id === "modal") closeModal(); });
+
+// ---- BGM ピッカー（全画面） ------------------------------------------
+function openPicker() {
+  $("#source-search").value = "";
+  $("#picker").classList.remove("hidden");
+  loadSources("");
+}
+function closePicker() { $("#picker").classList.add("hidden"); }
+
+$("#pick-source").addEventListener("click", openPicker);
+$("#picker-back").addEventListener("click", closePicker);
+$("#picker").addEventListener("click", (e) => { if (e.target.id === "picker") closePicker(); });
 
 // ---- 音源の閲覧・検索 ----------------------------------------------
 async function loadSources(query) {
@@ -211,22 +264,26 @@ async function loadSources(query) {
     const sources = await api(`/api/sources?q=${encodeURIComponent(query)}`);
     hint.textContent = sources.length ? "" : "該当する音源がありません。";
     for (const src of sources) {
-      const row = document.createElement("div");
+      const row = document.createElement("button");
+      row.type = "button";
       row.className = "source-item";
       if (selectedSource && selectedSource.type === src.type && selectedSource.title === src.title) {
         row.classList.add("selected");
       }
-      row.innerHTML = `<span class="s-title">${escapeHtml(src.title)}</span><span class="tag">${escapeHtml(src.subtitle)}</span>`;
+      const icon = src.type === "favorite" ? "⭐" : "🎵";
+      row.innerHTML = `<span class="s-icon">${icon}</span>` +
+        `<span class="s-title">${escapeHtml(src.title)}</span>` +
+        `<span class="tag">${escapeHtml(src.subtitle)}</span>`;
       row.onclick = () => {
+        // タップ＝選択確定。ピッカーを閉じてフォームに反映する。
         selectedSource = { type: src.type, title: src.title, uri: src.uri };
         renderSelectedSource();
-        list.querySelectorAll(".source-item").forEach((el) => el.classList.remove("selected"));
-        row.classList.add("selected");
+        closePicker();
       };
       list.appendChild(row);
     }
   } catch (e) {
-    hint.textContent = e.message + "（部屋の設定を確認してください）";
+    hint.textContent = e.message;
   }
 }
 
@@ -244,7 +301,7 @@ $("#schedule-form").addEventListener("submit", async (e) => {
   if (!selectedSource) { err.textContent = "BGM（プレイリスト/お気に入り）を選んでください。"; err.classList.remove("hidden"); return; }
 
   let sleep = null;
-  const sv = $("#f-sleep").value;
+  const sv = currentSleepChip();
   if (sv === "custom") sleep = parseInt($("#f-sleep-custom").value, 10) || null;
   else if (sv !== "") sleep = parseInt(sv, 10);
 

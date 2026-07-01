@@ -100,6 +100,17 @@ def test_fade_none_rejected():
         make_schedule(fade_in_seconds=None).validate()
 
 
+def test_put_settings_empty_room_does_not_overwrite(tmp_path):
+    """部屋検出失敗時などに空文字が送られても、設定済みの部屋を消さない。"""
+    store = Store(tmp_path / "data.json")
+    store.update_settings(room="主書斎")
+    c = webapp.create_app(store, runner=None).test_client()
+
+    res = c.put("/api/settings", json={"room": ""})
+    assert res.status_code == 200
+    assert store.get_settings().room == "主書斎"  # 上書きされていない
+
+
 def test_api_bad_volume_returns_400_not_500(tmp_path):
     store = Store(tmp_path / "data.json")
     c = webapp.create_app(store, runner=None).test_client()

@@ -49,35 +49,32 @@
           <input type="text" id="f-name" placeholder="例: 夜の睡眠BGM" required />
         </label>
 
-        <div class="row">
-          <label>再生開始時刻
-            <input type="time" id="f-time" value="21:00" required />
-          </label>
-          <label>スリープタイマー
-            <select id="f-sleep">
-              <option value="">無効</option>
-              <option value="15">15分</option>
-              <option value="30">30分</option>
-              <option value="45">45分</option>
-              <option value="60" selected>60分（既定）</option>
-              <option value="90">90分</option>
-              <option value="120">120分</option>
-              <option value="custom">その他…</option>
-            </select>
-          </label>
-          <label id="sleep-custom-wrap" class="hidden">任意（分）
-            <input type="number" id="f-sleep-custom" min="1" placeholder="分" />
-          </label>
+        <label>再生開始時刻
+          <input type="time" id="f-time" value="21:00" required />
+        </label>
+
+        <div class="field">
+          <span class="field-label">BGM（プレイリスト / お気に入り）</span>
+          <button type="button" id="pick-source" class="pick-btn">
+            <span class="pick-icon">🎵</span>
+            <span id="pick-source-label">タップして選ぶ</span>
+            <span class="chev">›</span>
+          </button>
         </div>
 
-        <div class="source-block">
-          <div class="source-head">
-            <span>BGM（プレイリスト / お気に入り）</span>
-            <span id="selected-source" class="selected-source">未選択</span>
+        <div class="field">
+          <span class="field-label">スリープタイマー（自動停止）</span>
+          <div id="sleep-chips" class="chips">
+            <button type="button" class="chip" data-val="">無効</button>
+            <button type="button" class="chip" data-val="15">15分</button>
+            <button type="button" class="chip" data-val="30">30分</button>
+            <button type="button" class="chip" data-val="45">45分</button>
+            <button type="button" class="chip" data-val="60">60分</button>
+            <button type="button" class="chip" data-val="90">90分</button>
+            <button type="button" class="chip" data-val="120">120分</button>
+            <button type="button" class="chip" data-val="custom">その他</button>
           </div>
-          <input type="text" id="source-search" placeholder="🔍 プレイリストを検索…" />
-          <div id="source-list" class="source-list"></div>
-          <p id="source-hint" class="hint"></p>
+          <input type="number" id="f-sleep-custom" class="hidden" min="1" placeholder="分数を入力（例: 75）" />
         </div>
 
         <div class="row">
@@ -99,6 +96,19 @@
           <button type="submit" class="primary">保存</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- BGM 選択ピッカー（Sonos アプリ風の全画面リスト） -->
+  <div id="picker" class="modal hidden">
+    <div class="modal-box picker-box">
+      <div class="picker-head">
+        <button type="button" id="picker-back" class="ghost">‹ 戻る</button>
+        <h3>BGM を選ぶ</h3>
+      </div>
+      <input type="text" id="source-search" placeholder="🔍 プレイリスト・お気に入りを検索" autocomplete="off" />
+      <div id="source-list" class="source-list"></div>
+      <p id="source-hint" class="hint"></p>
     </div>
   </div>
 
