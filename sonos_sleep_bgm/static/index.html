@@ -104,15 +104,7 @@
 
   <div id="toast" class="toast hidden"></div>
 
-  <script>
-    // Service Worker はセキュアコンテキスト(localhost / HTTPS)でのみ登録できる。
-    // LAN の HTTP 越しでも「ホーム画面に追加」でアプリ起動は可能なので、登録は任意。
-    if ("serviceWorker" in navigator && window.isSecureContext) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js").catch(() => {});
-      });
-    }
-  </script>
+  <!-- CSP を厳格に保つためインラインスクリプトは置かない(SW登録も app.js 内)。 -->
   <script src="app.js"></script>
 </body>
 </html>

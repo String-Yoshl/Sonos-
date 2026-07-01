@@ -5,11 +5,43 @@ const $ = (sel) => document.querySelector(sel);
 let selectedSource = null; // {type, title, uri}
 let searchTimer = null;
 
-async function api(path, opts) {
-  const res = await fetch(path, {
-    headers: { "Content-Type": "application/json" },
-    ...opts,
+// Service Worker はセキュアコンテキスト(localhost / HTTPS)でのみ登録できる。
+// LAN の HTTP 越しでも「ホーム画面に追加」でアプリ起動は可能なので、登録は任意。
+if ("serviceWorker" in navigator && window.isSecureContext) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
   });
+}
+
+// ---- 認証トークン -----------------------------------------------------
+// サーバ起動時に表示される URL の ?token=... を取り込んで保存し、URL からは消す。
+const TOKEN_KEY = "bgm_token";
+{
+  const params = new URLSearchParams(location.search);
+  const fromUrl = params.get("token");
+  if (fromUrl) {
+    localStorage.setItem(TOKEN_KEY, fromUrl.trim());
+    history.replaceState(null, "", location.pathname);
+  }
+}
+const getToken = () => localStorage.getItem(TOKEN_KEY) || "";
+
+async function api(path, opts) {
+  const doFetch = () =>
+    fetch(path, {
+      headers: { "Content-Type": "application/json", "X-Auth-Token": getToken() },
+      ...opts,
+    });
+  let res = await doFetch();
+  if (res.status === 401) {
+    const entered = prompt(
+      "アクセストークンを入力してください（サーバ起動時のコンソールに表示されています）"
+    );
+    if (entered) {
+      localStorage.setItem(TOKEN_KEY, entered.trim());
+      res = await doFetch();
+    }
+  }
   let body = null;
   try { body = await res.json(); } catch (_) {}
   if (!res.ok) {

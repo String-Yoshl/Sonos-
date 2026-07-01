@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hmac
 import logging
 
 from flask import Flask, jsonify, request, send_from_directory
@@ -35,8 +36,45 @@ def _schedule_from_payload(data: dict) -> Schedule:
     )
 
 
-def create_app(store: Store, runner: ScheduleRunner | None = None) -> Flask:
+def create_app(
+    store: Store,
+    runner: ScheduleRunner | None = None,
+    auth_token: str | None = None,
+) -> Flask:
+    """アプリを生成する。auth_token を渡すと /api/* にトークン認証を要求する。"""
     app = Flask(__name__, static_folder="static", static_url_path="")
+
+    # ---- 認証 (S1): /api/* はトークン必須 --------------------------------
+    if auth_token:
+
+        @app.before_request
+        def require_token():
+            if not request.path.startswith("/api/"):
+                return None  # UI シェル・静的ファイルは認証不要（秘密を含まない）
+            supplied = request.headers.get("X-Auth-Token", "")
+            if not supplied:
+                bearer = request.headers.get("Authorization", "")
+                if bearer.startswith("Bearer "):
+                    supplied = bearer[len("Bearer "):]
+            # タイミング攻撃を避けるため定数時間比較を使う。
+            if not hmac.compare_digest(supplied, auth_token):
+                return jsonify(error="認証が必要です。アクセストークンを指定してください。"), 401
+            return None
+
+    # ---- セキュリティヘッダ (S2) / API キャッシュ抑止 (S4) ---------------
+    @app.after_request
+    def security_headers(resp):
+        resp.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; img-src 'self' data:; "
+            "base-uri 'none'; frame-ancestors 'none'",
+        )
+        resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+        resp.headers.setdefault("X-Frame-Options", "DENY")
+        resp.headers.setdefault("Referrer-Policy", "no-referrer")
+        if request.path.startswith("/api/"):
+            resp.headers["Cache-Control"] = "no-store"
+        return resp
 
     def sync_runner() -> None:
         if runner is not None:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime as dt
+import urllib.parse
 import uuid
 
 # 音源の種類。
@@ -11,6 +12,10 @@ SOURCE_PLAYLIST = "playlist"   # Sonos プレイリスト
 SOURCE_FAVORITE = "favorite"   # Sonos お気に入り
 SOURCE_URI = "uri"             # 直接 URI
 VALID_SOURCE_TYPES = {SOURCE_PLAYLIST, SOURCE_FAVORITE, SOURCE_URI}
+
+# 音源 URI として意味がなく、注入の温床になり得るスキームは拒否する。
+# (Sonos 独自の x-rincon-* / x-sonosapi-* 等は許可したいため拒否リスト方式)
+BLOCKED_URI_SCHEMES = {"javascript", "data", "file", "vbscript", "about", "blob"}
 
 
 def parse_hhmm(value: str) -> tuple[int, int]:
@@ -33,6 +38,12 @@ class Source:
         if self.type == SOURCE_URI:
             if not self.uri:
                 raise ValueError("uri タイプには uri が必要です。")
+            scheme = urllib.parse.urlsplit(self.uri).scheme.lower()
+            if not scheme or scheme in BLOCKED_URI_SCHEMES:
+                raise ValueError(
+                    f"uri のスキームが不正です: {self.uri!r}"
+                    "（http/https や Sonos 用スキームを指定してください）"
+                )
         else:
             if not self.title:
                 raise ValueError(f"{self.type} タイプには title が必要です。")

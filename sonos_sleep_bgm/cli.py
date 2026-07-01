@@ -14,6 +14,7 @@ import socket
 import sys
 
 from . import sonos_client
+from .auth import load_or_create_token
 from .scheduler import ScheduleRunner
 from .store import DEFAULT_DATA_PATH, Store
 from .webapp import create_app
@@ -41,19 +42,23 @@ def _lan_ip() -> str:
 
 def _cmd_serve(args: argparse.Namespace) -> int:
     store = Store(args.data)
+    # LAN 内の第三者による操作を防ぐため、API はトークン認証必須にする。
+    token = args.token or load_or_create_token(args.data)
     runner = ScheduleRunner(store)
     runner.start()
-    app = create_app(store, runner)
+    app = create_app(store, runner, auth_token=token)
     if args.host == "0.0.0.0":
-        print("=" * 52)
+        print("=" * 60)
         print("  Sonos 睡眠 BGM を起動しました (Ctrl+C で終了)")
-        print(f"  このPC:   http://127.0.0.1:{args.port}")
-        print(f"  スマホ:   http://{_lan_ip()}:{args.port}")
+        print(f"  このPC:   http://127.0.0.1:{args.port}/?token={token}")
+        print(f"  スマホ:   http://{_lan_ip()}:{args.port}/?token={token}")
         print("    → スマホのブラウザで上記を開き、")
         print("      『ホーム画面に追加』でアプリとして使えます。")
-        print("=" * 52)
+        print(f"  アクセストークン: {token}")
+        print("    (data/auth_token に保存。URL で一度開けば端末に記憶されます)")
+        print("=" * 60)
     else:
-        print(f"Web UI: http://{args.host}:{args.port}  (Ctrl+C で終了)")
+        print(f"Web UI: http://{args.host}:{args.port}/?token={token}  (Ctrl+C で終了)")
     try:
         # スケジューラは別スレッドなので reloader は無効にする。
         app.run(host=args.host, port=args.port, use_reloader=False)
@@ -95,9 +100,14 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_serve = sub.add_parser("serve", help="Web UI + スケジューラを起動する")
-    # スマホからアプリとして使えるよう、既定で LAN に公開する。
+    # スマホからアプリとして使えるよう、既定で LAN に公開する(API はトークン認証)。
     p_serve.add_argument("--host", default="0.0.0.0")
     p_serve.add_argument("--port", type=int, default=8765)
+    p_serve.add_argument(
+        "--token",
+        default=None,
+        help="アクセストークンを明示指定する(省略時は data/auth_token を自動生成・再利用)",
+    )
     p_serve.set_defaults(func=_cmd_serve)
 
     p_rooms = sub.add_parser("list-rooms", help="検出できた部屋を表示する")
