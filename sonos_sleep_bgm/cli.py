@@ -12,7 +12,10 @@ import argparse
 import logging
 import socket
 import sys
+import webbrowser
+from pathlib import Path
 
+from . import qr as qrgen
 from . import sonos_client
 from .auth import load_or_create_token
 from .scheduler import ScheduleRunner
@@ -40,17 +43,28 @@ def _lan_ip() -> str:
         s.close()
 
 
-def _print_qr(url: str) -> None:
-    """スマホのカメラで読めるよう、URL の QR コードをターミナルに表示する。"""
-    try:
-        import qrcode
-    except ImportError:
-        print("  (QR 表示には `pip install qrcode` が必要です)")
-        return
-    qr = qrcode.QRCode(border=1)
-    qr.add_data(url)
-    qr.make(fit=True)
-    qr.print_ascii(invert=True)
+def _show_qr(phone_url: str, data_path: str) -> None:
+    """スマホ用 QR を提示する。
+
+    端末依存を避けるため、まず QR 画像(HTML)をファイルに書き出して
+    既定ブラウザで自動オープンする。あわせて端末にも ASCII QR を試みる。
+    """
+    # 1) 端末非依存の確実な方法: HTML ファイルに書き出してブラウザで開く。
+    qr_path = qrgen.write_html(phone_url, Path(data_path).parent / "qr.html")
+    if qr_path is not None:
+        print(f"  ■ スマホ用 QR 画像を開きます: {qr_path}")
+        print("    (自動で開かない場合は上記ファイルをブラウザで開いてください)")
+        try:
+            webbrowser.open(qr_path.resolve().as_uri())
+        except Exception:
+            pass
+    else:
+        print("  (QR 生成には `pip install qrcode` が必要です)")
+
+    # 2) おまけ: 端末にも QR を出す(出せない環境では黙ってスキップ)。
+    print("  ▼ 端末にも QR を表示します(文字化けする場合は上の画像を使用)")
+    print()
+    qrgen.print_terminal(phone_url)
 
 
 def _cmd_serve(args: argparse.Namespace) -> int:
@@ -66,12 +80,10 @@ def _cmd_serve(args: argparse.Namespace) -> int:
         print("  Sonos 睡眠 BGM を起動しました (Ctrl+C で終了)")
         print(f"  このPC:   http://127.0.0.1:{args.port}/?token={token}")
         print(f"  スマホ:   {phone_url}")
+        print("    → スマホで開いたら「ホーム画面に追加」でアプリ完成")
         print("=" * 60)
         if not args.no_qr:
-            print("  ▼ スマホのカメラでこの QR を読み取ってください")
-            print("    (開いたら共有 →「ホーム画面に追加」でアプリ完成)")
-            print()
-            _print_qr(phone_url)
+            _show_qr(phone_url, args.data)
         print(f"  アクセストークン: {token}")
         print("    (data/auth_token に保存。URL で一度開けば端末に記憶されます)")
         print("=" * 60)
