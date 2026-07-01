@@ -122,10 +122,13 @@ def create_app(
     @app.put("/api/settings")
     def api_put_settings():
         data = request.get_json(silent=True) or {}
-        settings = store.update_settings(
-            room=data.get("room"),
-            timezone=data.get("timezone"),
-        )
+        try:
+            settings = store.update_settings(
+                room=data.get("room"),
+                timezone=data.get("timezone"),
+            )
+        except ValueError as exc:
+            return jsonify(error=str(exc)), 400
         sync_runner()
         return jsonify(settings.to_dict())
 

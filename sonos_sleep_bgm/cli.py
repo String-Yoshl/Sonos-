@@ -60,8 +60,10 @@ def _cmd_serve(args: argparse.Namespace) -> int:
     else:
         print(f"Web UI: http://{args.host}:{args.port}/?token={token}  (Ctrl+C で終了)")
     try:
-        # スケジューラは別スレッドなので reloader は無効にする。
-        app.run(host=args.host, port=args.port, use_reloader=False)
+        # reloader はスケジューラと二重起動になるため無効。
+        # threaded=True でないと 1 リクエストが全体をブロックする
+        # (werkzeug の既定はシングルスレッド)。
+        app.run(host=args.host, port=args.port, use_reloader=False, threaded=True)
     finally:
         runner.shutdown()
     return 0

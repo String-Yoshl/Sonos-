@@ -6,6 +6,7 @@ import dataclasses
 import datetime as dt
 import urllib.parse
 import uuid
+import zoneinfo
 
 # 音源の種類。
 SOURCE_PLAYLIST = "playlist"   # Sonos プレイリスト
@@ -78,12 +79,42 @@ class Schedule:
     # スリープタイマー（分）。None は無効。既定は 60 分。
     sleep_timer_minutes: int | None = 60
 
+    @staticmethod
+    def _coerce_int(value, field: str, allow_none: bool) -> int | None:
+        """数値フィールドを int に正規化する。bool や非数値は明確に拒否する。
+
+        JSON の true は Python では int のサブクラス(bool)であり、
+        0 <= True <= 100 のような範囲チェックをすり抜けるため明示的に弾く。
+        """
+        if value is None:
+            if allow_none:
+                return None
+            raise ValueError(f"{field} は整数で指定してください。")
+        if isinstance(value, bool):
+            raise ValueError(f"{field} は整数で指定してください。")
+        if isinstance(value, int):
+            return value
+        if isinstance(value, str):
+            try:
+                return int(value.strip())
+            except ValueError:
+                pass
+        raise ValueError(f"{field} は整数で指定してください: {value!r}")
+
     def validate(self) -> None:
         if not str(self.name).strip():
             raise ValueError("name（セット名）は必須です。")
         # 時刻の妥当性チェック。
         parse_hhmm(self.time)
         self.source.validate()
+        # 型を先に正規化してから範囲チェックする(文字列や bool で 500 にならないように)。
+        self.volume = self._coerce_int(self.volume, "volume", allow_none=True)
+        self.fade_in_seconds = self._coerce_int(
+            self.fade_in_seconds, "fade_in_seconds", allow_none=False
+        )
+        self.sleep_timer_minutes = self._coerce_int(
+            self.sleep_timer_minutes, "sleep_timer_minutes", allow_none=True
+        )
         if self.volume is not None and not (0 <= self.volume <= 100):
             raise ValueError("volume は 0〜100 で指定してください。")
         if self.fade_in_seconds < 0:
@@ -135,6 +166,16 @@ class AppSettings:
 
     room: str | None = None  # 再生元の Sonos 部屋名（例: 主書斎）
     timezone: str = "Asia/Tokyo"
+
+    def validate(self) -> None:
+        # 不正な timezone を保存するとスケジューラが次回起動できなくなるため、
+        # 保存前に IANA 名として解決できることを確認する。
+        try:
+            zoneinfo.ZoneInfo(str(self.timezone))
+        except Exception as exc:  # ZoneInfoNotFoundError ほか
+            raise ValueError(
+                f"timezone が不正です: {self.timezone!r}（例: Asia/Tokyo）"
+            ) from exc
 
     def to_dict(self) -> dict:
         return {"room": self.room, "timezone": self.timezone}

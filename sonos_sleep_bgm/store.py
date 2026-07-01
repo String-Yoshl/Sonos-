@@ -54,7 +54,11 @@ class Store:
         with self._lock:
             data = self._settings.to_dict()
             data.update({k: v for k, v in changes.items() if v is not None})
-            self._settings = AppSettings.from_dict(data)
+            candidate = AppSettings.from_dict(data)
+            # 不正な値(壊れた timezone 等)を保存すると次回起動に失敗するため、
+            # 検証を通ってから初めて反映・保存する。
+            candidate.validate()
+            self._settings = candidate
             self._save()
             return self.get_settings()
 

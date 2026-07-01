@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
 
 import soco
@@ -148,7 +149,18 @@ def play_schedule(room: str, schedule: Schedule) -> None:
             device.play_from_queue(0)
 
         if schedule.volume is not None:
-            _apply_volume(device, schedule.volume, schedule.fade_in_seconds)
+            if schedule.fade_in_seconds > 0:
+                # フェードは最大数十秒かかるため、呼び出し元(HTTP リクエストや
+                # スケジューラのジョブスレッド)をブロックしないよう別スレッドで行う。
+                device.volume = 0
+                threading.Thread(
+                    target=_apply_volume,
+                    args=(device, schedule.volume, schedule.fade_in_seconds),
+                    daemon=True,
+                    name=f"fade-{schedule.id}",
+                ).start()
+            else:
+                device.volume = schedule.volume
 
         # スリープタイマー（Sonos ネイティブ機能）。None で無効。
         if schedule.sleep_timer_minutes:
