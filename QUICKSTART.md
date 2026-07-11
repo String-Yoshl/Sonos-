@@ -42,6 +42,27 @@ powershell -ExecutionPolicy Bypass -File install.ps1
 
 ---
 
+## 🌏 外出先からも使う（オプション・無料）
+
+そのままでは自宅 Wi-Fi 内でしか使えません。**外出先（モバイル回線）からも**
+スケジュールの変更や再生をしたい場合は、[Tailscale](https://tailscale.com/)
+（個人利用無料の VPN）を入れるだけで対応できます。アプリ側は**自動で検出**します。
+
+1. **ホスト（サーバを動かす PC / Raspberry Pi）に Tailscale をインストール**してログイン
+   - https://tailscale.com/download （Google/Apple/GitHub アカウントで OK）
+2. **スマホにも Tailscale アプリ**を入れて**同じアカウント**でログイン（VPN を ON）
+3. サーバを再起動（`serve`）→ QR ページに
+   **「📶 外出先でも使える (Tailscale・推奨)」の QR** が追加で表示される
+4. その QR をスキャンして**ホーム画面に追加**し直す
+
+Tailscale の URL は**自宅でも外でも同じ**なので、以後はこちらを常用してください
+（自宅 Wi-Fi 用のアイコンは削除して OK）。通信は WireGuard で暗号化され、
+あなたのアカウントの端末以外からは一切届きません。
+
+> ⚠️ **ルータのポート開放（ポートフォワーディング）はしないでください。**
+> 操作 API が全インターネットに露出します。外部アクセスは必ず Tailscale
+> などの VPN 経由にしてください。
+
 ### ずっと動かしておくには
 PC/Raspberry Pi を消しても自動起動するよう、`README.md` の systemd 設定を参照してください。
 

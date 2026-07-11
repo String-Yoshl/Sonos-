@@ -9,8 +9,10 @@
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import logging
 import socket
+import subprocess
 import sys
 import webbrowser
 from pathlib import Path
@@ -43,14 +45,41 @@ def _lan_ip() -> str:
         s.close()
 
 
-def _show_qr(phone_url: str, data_path: str) -> None:
+def _tailscale_ip() -> str | None:
+    """Tailscale がインストール済みならその IPv4 (100.64.0.0/10) を返す。
+
+    Tailscale を使うと、外出先(モバイル回線)からも自宅のこのサーバへ
+    安全に(WireGuard 暗号化で)届くため、同じアプリが外でも使える。
+    """
+    candidates = (
+        ["tailscale", "ip", "-4"],
+        [r"C:\Program Files\Tailscale\tailscale.exe", "ip", "-4"],  # Windows 既定
+    )
+    for cmd in candidates:
+        try:
+            out = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
+        except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+            continue
+        if out.returncode != 0:
+            continue
+        for line in out.stdout.split():
+            try:
+                ip = ipaddress.ip_address(line.strip())
+            except ValueError:
+                continue
+            if ip in ipaddress.ip_network("100.64.0.0/10"):
+                return str(ip)
+    return None
+
+
+def _show_qr(entries: list[tuple[str, str]], data_path: str) -> None:
     """スマホ用 QR を提示する。
 
     端末依存を避けるため、まず QR 画像(HTML)をファイルに書き出して
     既定ブラウザで自動オープンする。あわせて端末にも ASCII QR を試みる。
     """
     # 1) 端末非依存の確実な方法: HTML ファイルに書き出してブラウザで開く。
-    qr_path = qrgen.write_html(phone_url, Path(data_path).parent / "qr.html")
+    qr_path = qrgen.write_html(entries, Path(data_path).parent / "qr.html")
     if qr_path is not None:
         print(f"  ■ スマホ用 QR 画像を開きます: {qr_path}")
         print("    (自動で開かない場合は上記ファイルをブラウザで開いてください)")
@@ -64,7 +93,7 @@ def _show_qr(phone_url: str, data_path: str) -> None:
     # 2) おまけ: 端末にも QR を出す(出せない環境では黙ってスキップ)。
     print("  ▼ 端末にも QR を表示します(文字化けする場合は上の画像を使用)")
     print()
-    qrgen.print_terminal(phone_url)
+    qrgen.print_terminal(entries[0][1])
 
 
 def _cmd_serve(args: argparse.Namespace) -> int:
@@ -75,15 +104,25 @@ def _cmd_serve(args: argparse.Namespace) -> int:
     runner.start()
     app = create_app(store, runner, auth_token=token)
     if args.host == "0.0.0.0":
-        phone_url = f"http://{_lan_ip()}:{args.port}/?token={token}"
+        lan_url = f"http://{_lan_ip()}:{args.port}/?token={token}"
+        ts_ip = _tailscale_ip()
         print("=" * 60)
         print("  Sonos 睡眠 BGM を起動しました (Ctrl+C で終了)")
-        print(f"  このPC:   http://127.0.0.1:{args.port}/?token={token}")
-        print(f"  スマホ:   {phone_url}")
+        print(f"  このPC:      http://127.0.0.1:{args.port}/?token={token}")
+        print(f"  自宅Wi-Fi:   {lan_url}")
+        entries = [("自宅 Wi-Fi 用", lan_url)]
+        if ts_ip:
+            ts_url = f"http://{ts_ip}:{args.port}/?token={token}"
+            print(f"  外出先(Tailscale): {ts_url}")
+            print("    → スマホにも Tailscale を入れておけば、外からも同じアプリが使えます")
+            # Tailscale IP は自宅でも外でも同じ経路で届くため、こちらを常用推奨。
+            entries.insert(0, ("📶 外出先でも使える (Tailscale・推奨)", ts_url))
+        else:
+            print("  (外出先からも使いたい場合は Tailscale を導入 → QUICKSTART.md 参照)")
         print("    → スマホで開いたら「ホーム画面に追加」でアプリ完成")
         print("=" * 60)
         if not args.no_qr:
-            _show_qr(phone_url, args.data)
+            _show_qr(entries, args.data)
         print(f"  アクセストークン: {token}")
         print("    (data/auth_token に保存。URL で一度開けば端末に記憶されます)")
         print("=" * 60)

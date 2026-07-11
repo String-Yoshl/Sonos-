@@ -147,7 +147,9 @@ Sonos 実機がなくても通るよう、再生まわりはモックでテス�
 - レスポンスには CSP / nosniff / frame-ancestors 等のセキュリティヘッダを付与し、
   `/api` は `Cache-Control: no-store` でキャッシュを抑止しています。
 - それでも**インターネットへの直接公開（ルータのポート開放）はしないでください**。
-  外出先から使う場合は VPN（WireGuard / Tailscale 等）経由を推奨します。
+  外出先から使う場合は Tailscale 経由にしてください。ホストに Tailscale が
+  入っていれば `serve` が**自動検出**し、外出先用の URL / QR も表示します
+  （手順は [QUICKSTART.md](QUICKSTART.md) の「外出先からも使う」参照）。
 - 自分の PC だけで使う場合は `serve --host 127.0.0.1` で LAN 公開を止められます。
 
 ## 注意

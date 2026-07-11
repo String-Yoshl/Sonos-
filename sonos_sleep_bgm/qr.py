@@ -46,13 +46,28 @@ def build_svg(url: str, scale: int = 8) -> str:
     )
 
 
-def write_html(url: str, out_path: str | Path) -> Path | None:
-    """スキャン用の QR ページ(HTML)を書き出す。失敗時は None。"""
-    try:
-        svg = build_svg(url)
-    except Exception:
-        return None
-    safe_url = html.escape(url, quote=True)
+def write_html(
+    entries: str | list[tuple[str, str]], out_path: str | Path
+) -> Path | None:
+    """スキャン用の QR ページ(HTML)を書き出す。失敗時は None。
+
+    entries には URL 1 つ、または (ラベル, URL) のリストを渡せる。
+    複数渡すと「自宅 Wi-Fi 用」「外出先(Tailscale)用」のように並べて表示する。
+    """
+    if isinstance(entries, str):
+        entries = [("📱 スマホのカメラでスキャン", entries)]
+    sections = []
+    for label, url in entries:
+        try:
+            svg = build_svg(url)
+        except Exception:
+            return None
+        safe_url = html.escape(url, quote=True)
+        sections.append(
+            f"<section><h2>{html.escape(label)}</h2>"
+            f'<div class="card">{svg}</div>'
+            f'<p><a href="{safe_url}">{safe_url}</a></p></section>'
+        )
     page = (
         '<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
@@ -60,11 +75,11 @@ def write_html(url: str, out_path: str | Path) -> Path | None:
         "body{font-family:sans-serif;text-align:center;padding:24px;"
         "background:#0e1014;color:#e9edf2}"
         ".card{background:#fff;display:inline-block;padding:16px;border-radius:14px}"
+        "section{margin-bottom:36px}"
         "a{color:#6ee7b7;word-break:break-all}</style></head><body>"
-        "<h2>📱 スマホのカメラでスキャン</h2>"
-        f'<div class="card">{svg}</div>'
-        "<p>読み取って開いたら、共有 →「ホーム画面に追加」でアプリ完成です。</p>"
-        f'<p>読めない場合はこの URL を直接入力:<br><a href="{safe_url}">{safe_url}</a></p>'
+        + "".join(sections)
+        + "<p>読み取って開いたら、共有 →「ホーム画面に追加」でアプリ完成です。<br>"
+        "読めない場合は URL を直接入力しても同じです。</p>"
         "</body></html>"
     )
     path = Path(out_path)

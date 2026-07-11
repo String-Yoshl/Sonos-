@@ -30,6 +30,19 @@ def test_write_html_escapes_url(tmp_path):
     assert "&lt;script&gt;" in text
 
 
+def test_write_html_multiple_entries(tmp_path):
+    out = qrgen.write_html(
+        [("自宅 Wi-Fi 用", "http://192.168.1.2:8765/?token=a"),
+         ("外出先 (Tailscale)", "http://100.101.102.103:8765/?token=a")],
+        tmp_path / "qr.html",
+    )
+    text = out.read_text(encoding="utf-8")
+    assert "自宅 Wi-Fi 用" in text
+    assert "外出先 (Tailscale)" in text
+    assert text.count("<svg") == 2  # QR が 2 つ並ぶ
+    assert "100.101.102.103" in text
+
+
 def test_matrix_has_expected_structure():
     m = qrgen._matrix(URL)
     assert len(m) == len(m[0])  # 正方
