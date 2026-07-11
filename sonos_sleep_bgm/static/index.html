@@ -24,6 +24,7 @@
       <label for="room">再生する部屋</label>
       <select id="room"></select>
       <button id="refresh-rooms" class="ghost" title="部屋を再検出">⟳</button>
+      <button id="open-settings" class="ghost" title="設定">⚙</button>
     </div>
   </header>
 
@@ -77,6 +78,12 @@
           <input type="number" id="f-sleep-custom" class="hidden" min="1" placeholder="分数を入力（例: 75）" />
         </div>
 
+        <div class="field">
+          <span class="field-label">SwitchBot 連携（任意・エアコンを消す等）</span>
+          <div id="sb-actions" class="sb-actions"></div>
+          <button type="button" id="add-sb" class="ghost">＋ SwitchBot 操作を追加</button>
+        </div>
+
         <div class="row">
           <label>音量: <span id="vol-label">18</span>
             <input type="range" id="f-volume" min="0" max="100" value="18" />
@@ -109,6 +116,45 @@
       <input type="text" id="source-search" placeholder="🔍 プレイリスト・お気に入りを検索" autocomplete="off" />
       <div id="source-list" class="source-list"></div>
       <p id="source-hint" class="hint"></p>
+    </div>
+  </div>
+
+  <!-- SwitchBot デバイスピッカー -->
+  <div id="sb-picker" class="modal hidden">
+    <div class="modal-box picker-box">
+      <div class="picker-head">
+        <button type="button" id="sb-picker-back" class="ghost">‹ 戻る</button>
+        <h3>SwitchBot 操作を追加</h3>
+      </div>
+      <p class="hint">デバイスを選んで「OFF にする / ON にする」をタップしてください。</p>
+      <div id="sb-list" class="source-list"></div>
+      <p id="sb-hint" class="hint"></p>
+      <button type="button" id="sb-open-settings" class="ghost hidden">⚙ SwitchBot を設定する</button>
+    </div>
+  </div>
+
+  <!-- 設定モーダル（SwitchBot 認証情報） -->
+  <div id="settings-modal" class="modal hidden">
+    <div class="modal-box">
+      <h3>⚙ 設定</h3>
+      <div class="field">
+        <span class="field-label">SwitchBot 連携: <span id="sb-status">未設定</span></span>
+        <p class="hint">
+          SwitchBot アプリ → プロフィール → 設定 → アプリバージョンを 10 回タップ →
+          「開発者向けオプション」でトークンとシークレットを取得できます。
+        </p>
+        <label class="field">トークン
+          <input type="password" id="sb-token" placeholder="（変更する場合のみ入力）" autocomplete="off" />
+        </label>
+        <label class="field">シークレット
+          <input type="password" id="sb-secret" placeholder="（変更する場合のみ入力）" autocomplete="off" />
+        </label>
+      </div>
+      <p id="settings-error" class="error hidden"></p>
+      <div class="modal-actions">
+        <button type="button" id="settings-cancel" class="ghost">閉じる</button>
+        <button type="button" id="settings-save" class="primary">保存</button>
+      </div>
     </div>
   </div>
 

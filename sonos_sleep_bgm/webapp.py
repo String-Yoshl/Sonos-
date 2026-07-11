@@ -7,8 +7,8 @@ import logging
 
 from flask import Flask, jsonify, request, send_from_directory
 
-from . import sonos_client
-from .models import Schedule, Source
+from . import sonos_client, switchbot
+from .models import Schedule, Source, SwitchBotAction
 from .scheduler import ScheduleRunner
 from .store import Store
 
@@ -25,6 +25,11 @@ def _schedule_from_payload(data: dict) -> Schedule:
         title=src.get("title", ""),
         uri=src.get("uri"),
     )
+    actions = [
+        SwitchBotAction.from_dict(a)
+        for a in (data.get("switchbot_actions") or [])
+        if isinstance(a, dict)
+    ]
     return Schedule(
         name=data.get("name", ""),
         time=data.get("time", ""),
@@ -33,6 +38,7 @@ def _schedule_from_payload(data: dict) -> Schedule:
         volume=data.get("volume", 18),
         fade_in_seconds=data.get("fade_in_seconds", 0),
         sleep_timer_minutes=data.get("sleep_timer_minutes", 60),
+        switchbot_actions=actions,
     )
 
 
@@ -115,9 +121,17 @@ def create_app(
         except Exception as exc:  # noqa: BLE001
             return jsonify(error=str(exc)), 502
 
+    def _public_settings(settings) -> dict:
+        """秘密情報(SwitchBot のトークン/シークレット)を UI へ返さない形にする。"""
+        d = settings.to_dict()
+        token = d.pop("switchbot_token", None)
+        secret = d.pop("switchbot_secret", None)
+        d["switchbot_configured"] = bool(token and secret)
+        return d
+
     @app.get("/api/settings")
     def api_get_settings():
-        return jsonify(store.get_settings().to_dict())
+        return jsonify(_public_settings(store.get_settings()))
 
     @app.put("/api/settings")
     def api_put_settings():
@@ -127,11 +141,27 @@ def create_app(
                 # 空文字は「未指定」と同義に扱い、設定済みの部屋を誤って消さない。
                 room=data.get("room") or None,
                 timezone=data.get("timezone") or None,
+                # SwitchBot 認証情報は空文字で「解除」できるようそのまま通す。
+                switchbot_token=data.get("switchbot_token"),
+                switchbot_secret=data.get("switchbot_secret"),
             )
         except ValueError as exc:
             return jsonify(error=str(exc)), 400
         sync_runner()
-        return jsonify(settings.to_dict())
+        return jsonify(_public_settings(settings))
+
+    # ---- SwitchBot 連携 --------------------------------------------------
+    @app.get("/api/switchbot/devices")
+    def api_switchbot_devices():
+        s = store.get_settings()
+        if not s.switchbot_configured:
+            return jsonify(
+                error="SwitchBot が未設定です。⚙ 設定からトークンとシークレットを登録してください。"
+            ), 400
+        try:
+            return jsonify(switchbot.list_devices(s.switchbot_token, s.switchbot_secret))
+        except switchbot.SwitchBotError as exc:
+            return jsonify(error=str(exc)), 502
 
     # ---- 音源（プレイリスト/お気に入り）の閲覧・検索 -------------------
     @app.get("/api/sources")
@@ -188,11 +218,13 @@ def create_app(
         schedule = store.get_schedule(schedule_id)
         if schedule is None:
             return jsonify(error="スケジュールが見つかりません。"), 404
-        room = store.get_settings().room
+        settings = store.get_settings()
         try:
-            sonos_client.play_schedule(room, schedule)
+            sonos_client.play_schedule(settings.room, schedule)
         except sonos_client.SonosError as exc:
             return jsonify(error=str(exc)), 502
+        # 家電操作は再生と独立にベストエフォートで実行する(失敗はログのみ)。
+        switchbot.run_schedule_actions(settings, schedule)
         return jsonify(ok=True)
 
     return app

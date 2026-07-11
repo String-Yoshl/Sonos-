@@ -4,6 +4,7 @@ const $ = (sel) => document.querySelector(sel);
 
 let selectedSource = null; // {type, title, uri}
 let searchTimer = null;
+let sbActions = []; // 編集中セットの SwitchBot 操作 [{device_id, device_name, command, timing}]
 
 // Service Worker はセキュアコンテキスト(localhost / HTTPS)でのみ登録できる。
 // LAN の HTTP 越しでも「ホーム画面に追加」でアプリ起動は可能なので、登録は任意。
@@ -141,6 +142,8 @@ async function loadSchedules() {
         <div class="sub">${escapeHtml(s.source.title || s.source.uri || "")}
           <span class="tag">${sleepLabel(s.sleep_timer_minutes)}</span>
           <span class="tag">音量${s.volume ?? "—"}</span>
+          ${s.switchbot_actions && s.switchbot_actions.length
+            ? `<span class="tag">🔌SwitchBot ${s.switchbot_actions.length}件</span>` : ""}
         </div>
         <div class="next">${s.enabled ? fmtNext(s.next_run) : "（無効）"}</div>
       </div>
@@ -219,6 +222,8 @@ function openModal(s) {
 
   selectedSource = s ? { ...s.source } : null;
   renderSelectedSource();
+  sbActions = s && s.switchbot_actions ? s.switchbot_actions.map((a) => ({ ...a })) : [];
+  renderSbActions();
   $("#form-error").classList.add("hidden");
   $("#modal").classList.remove("hidden");
 }
@@ -253,6 +258,111 @@ function closePicker() { $("#picker").classList.add("hidden"); }
 $("#pick-source").addEventListener("click", openPicker);
 $("#picker-back").addEventListener("click", closePicker);
 $("#picker").addEventListener("click", (e) => { if (e.target.id === "picker") closePicker(); });
+
+// ---- SwitchBot 操作（エアコン OFF 等） --------------------------------
+function renderSbActions() {
+  const box = $("#sb-actions");
+  box.innerHTML = "";
+  sbActions.forEach((a, i) => {
+    const row = document.createElement("div");
+    row.className = "sb-row";
+    row.innerHTML =
+      `<span class="s-icon">🔌</span>` +
+      `<span class="s-title">${escapeHtml(a.device_name || a.device_id)}</span>` +
+      `<span class="badge ${a.command === "turnOff" ? "badge-off" : "badge-on"}">` +
+      `${a.command === "turnOff" ? "OFF" : "ON"}</span>` +
+      `<select class="sb-timing">` +
+      `<option value="start"${a.timing !== "end" ? " selected" : ""}>再生開始時</option>` +
+      `<option value="end"${a.timing === "end" ? " selected" : ""}>スリープ終了時</option>` +
+      `</select>` +
+      `<button type="button" class="sb-remove" title="削除">✕</button>`;
+    row.querySelector(".sb-timing").onchange = (e) => { sbActions[i].timing = e.target.value; };
+    row.querySelector(".sb-remove").onclick = () => { sbActions.splice(i, 1); renderSbActions(); };
+    box.appendChild(row);
+  });
+}
+
+async function openSbPicker() {
+  $("#sb-picker").classList.remove("hidden");
+  const list = $("#sb-list");
+  const hint = $("#sb-hint");
+  const openSettingsBtn = $("#sb-open-settings");
+  list.innerHTML = "";
+  openSettingsBtn.classList.add("hidden");
+  hint.textContent = "デバイスを取得中…";
+  try {
+    const devices = await api("/api/switchbot/devices");
+    hint.textContent = devices.length ? "" : "デバイスが見つかりません。SwitchBot アプリでデバイスを登録してください。";
+    for (const d of devices) {
+      const row = document.createElement("div");
+      row.className = "source-item sb-device";
+      row.innerHTML =
+        `<span class="s-icon">${d.infrared ? "📡" : "🔌"}</span>` +
+        `<span class="s-title">${escapeHtml(d.name)}<br><small>${escapeHtml(d.type)}</small></span>` +
+        `<button type="button" class="sb-add-off">OFF にする</button>` +
+        `<button type="button" class="sb-add-on">ON にする</button>`;
+      const add = (command) => {
+        sbActions.push({ device_id: d.id, device_name: d.name, command, timing: "start" });
+        renderSbActions();
+        closeSbPicker();
+        toast(`「${d.name} を ${command === "turnOff" ? "OFF" : "ON"}」を追加しました。保存を忘れずに。`);
+      };
+      row.querySelector(".sb-add-off").onclick = () => add("turnOff");
+      row.querySelector(".sb-add-on").onclick = () => add("turnOn");
+      list.appendChild(row);
+    }
+  } catch (e) {
+    hint.textContent = e.message;
+    if (String(e.message).includes("未設定")) openSettingsBtn.classList.remove("hidden");
+  }
+}
+function closeSbPicker() { $("#sb-picker").classList.add("hidden"); }
+
+$("#add-sb").addEventListener("click", openSbPicker);
+$("#sb-picker-back").addEventListener("click", closeSbPicker);
+$("#sb-picker").addEventListener("click", (e) => { if (e.target.id === "sb-picker") closeSbPicker(); });
+$("#sb-open-settings").addEventListener("click", () => { closeSbPicker(); openSettings(); });
+
+// ---- 設定モーダル（SwitchBot 認証情報） -------------------------------
+async function openSettings() {
+  $("#settings-error").classList.add("hidden");
+  $("#sb-token").value = "";
+  $("#sb-secret").value = "";
+  try {
+    const settings = await api("/api/settings");
+    $("#sb-status").textContent = settings.switchbot_configured ? "✅ 連携済み" : "未設定";
+  } catch (e) { $("#sb-status").textContent = "?"; }
+  $("#settings-modal").classList.remove("hidden");
+}
+function closeSettings() { $("#settings-modal").classList.add("hidden"); }
+
+$("#open-settings").addEventListener("click", openSettings);
+$("#settings-cancel").addEventListener("click", closeSettings);
+$("#settings-modal").addEventListener("click", (e) => { if (e.target.id === "settings-modal") closeSettings(); });
+
+$("#settings-save").addEventListener("click", async () => {
+  const token = $("#sb-token").value.trim();
+  const secret = $("#sb-secret").value.trim();
+  const err = $("#settings-error");
+  err.classList.add("hidden");
+  if (!token && !secret) { closeSettings(); return; } // 変更なし
+  if (!token || !secret) {
+    err.textContent = "トークンとシークレットの両方を入力してください。";
+    err.classList.remove("hidden");
+    return;
+  }
+  try {
+    await api("/api/settings", {
+      method: "PUT",
+      body: JSON.stringify({ switchbot_token: token, switchbot_secret: secret }),
+    });
+    closeSettings();
+    toast("SwitchBot の認証情報を保存しました。");
+  } catch (e) {
+    err.textContent = e.message;
+    err.classList.remove("hidden");
+  }
+});
 
 // ---- 音源の閲覧・検索 ----------------------------------------------
 async function loadSources(query) {
@@ -313,6 +423,7 @@ $("#schedule-form").addEventListener("submit", async (e) => {
     volume: parseInt($("#f-volume").value, 10),
     fade_in_seconds: parseInt($("#f-fade").value, 10) || 0,
     sleep_timer_minutes: sleep,
+    switchbot_actions: sbActions,
   };
 
   const id = $("#f-id").value;

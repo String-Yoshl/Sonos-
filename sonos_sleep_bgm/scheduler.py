@@ -7,7 +7,7 @@ import logging
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from . import sonos_client
+from . import sonos_client, switchbot
 from .store import Store
 
 logger = logging.getLogger(__name__)
@@ -35,13 +35,18 @@ class ScheduleRunner:
         schedule = self.store.get_schedule(schedule_id)
         if schedule is None or not schedule.enabled:
             return
-        room = self.store.get_settings().room
+        settings = self.store.get_settings()
         try:
-            sonos_client.play_schedule(room, schedule)
+            sonos_client.play_schedule(settings.room, schedule)
         except sonos_client.SonosError as exc:
             logger.error("再生失敗 (%s): %s", schedule.name, exc)
         except Exception:  # noqa: BLE001 - デーモンを止めない
             logger.exception("再生ジョブで予期しないエラー (%s)", schedule.name)
+        # 家電操作(エアコン OFF 等)は再生の成否と独立に実行する。
+        try:
+            switchbot.run_schedule_actions(settings, schedule)
+        except Exception:  # noqa: BLE001
+            logger.exception("SwitchBot 操作で予期しないエラー (%s)", schedule.name)
 
     def sync(self) -> None:
         """ストアの内容に合わせてジョブ群を貼り直す。設定変更後に呼ぶ。"""

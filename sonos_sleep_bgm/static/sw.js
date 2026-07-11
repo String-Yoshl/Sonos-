@@ -1,6 +1,6 @@
 /* Service Worker: アプリシェルをキャッシュしてアプリのように素早く起動する。
    API レスポンスはキャッシュせず常に最新を取得する（スケジュール状態は鮮度が重要）。 */
-const CACHE = "sleep-bgm-v3";
+const CACHE = "sleep-bgm-v4";
 const SHELL = [
   "./",
   "./index.html",

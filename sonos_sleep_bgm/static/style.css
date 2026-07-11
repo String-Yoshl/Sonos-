@@ -133,6 +133,29 @@ select, input[type=text], input[type=time], input[type=number] {
 .source-item .s-title { flex: 1; min-width: 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hint { color: var(--muted); font-size: .8rem; margin: 0; }
 
+/* SwitchBot 操作 */
+.sb-actions { display: flex; flex-direction: column; gap: 6px; }
+.sb-row {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  padding: 10px 12px; border-radius: 10px; background: #11141a;
+  border: 1px solid var(--line);
+}
+/* 1行目: アイコン+デバイス名(全幅・折り返し可) / 2行目: バッジ+タイミング+削除 */
+.sb-row .s-title { flex: 1 1 60%; min-width: 55%; white-space: normal; color: var(--text); }
+.badge { padding: 2px 9px; border-radius: 999px; font-size: .75rem; font-weight: 700; }
+.badge-off { background: #3a2530; color: var(--danger); }
+.badge-on { background: #1d3a2c; color: var(--accent-2); }
+.sb-timing { font-size: .8rem; padding: 6px 8px; }
+.sb-remove { background: transparent; border: none; color: var(--muted); font-size: 1rem; padding: 4px 6px; }
+/* デバイスピッカー: 名前を 1 行目全幅、ON/OFF ボタンを 2 行目に */
+.sb-device { flex-wrap: wrap; }
+.sb-device .s-title { flex: 1 1 100%; white-space: normal; }
+.sb-device .s-title small { color: var(--muted); }
+.sb-device .sb-add-off,
+.sb-device .sb-add-on { flex: 1; padding: 11px 0; border: none; font-weight: 600; }
+.sb-device .sb-add-off { background: #3a2530; color: var(--danger); }
+.sb-device .sb-add-on { background: #1d3a2c; color: var(--accent-2); }
+
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
 .error { color: var(--danger); font-size: .85rem; margin: 0; }
 

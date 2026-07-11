@@ -65,6 +65,46 @@ class Source:
         )
 
 
+# SwitchBot 操作で許可するコマンドとタイミング。
+SB_COMMANDS = {"turnOn", "turnOff"}
+SB_TIMINGS = {"start", "end"}  # start=再生開始時 / end=スリープタイマー終了時
+
+
+@dataclasses.dataclass
+class SwitchBotAction:
+    """スケジュールに紐づく SwitchBot デバイス操作（例: エアコンを消す）。"""
+
+    device_id: str
+    device_name: str = ""
+    command: str = "turnOff"
+    timing: str = "start"
+
+    def validate(self) -> None:
+        if not str(self.device_id).strip():
+            raise ValueError("SwitchBot 操作には device_id が必要です。")
+        if self.command not in SB_COMMANDS:
+            raise ValueError(f"SwitchBot コマンドが不正です: {self.command!r}")
+        if self.timing not in SB_TIMINGS:
+            raise ValueError(f"SwitchBot タイミングが不正です: {self.timing!r}")
+
+    def to_dict(self) -> dict:
+        return {
+            "device_id": self.device_id,
+            "device_name": self.device_name,
+            "command": self.command,
+            "timing": self.timing,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "SwitchBotAction":
+        return cls(
+            device_id=data.get("device_id", ""),
+            device_name=data.get("device_name", ""),
+            command=data.get("command", "turnOff"),
+            timing=data.get("timing", "start"),
+        )
+
+
 @dataclasses.dataclass
 class Schedule:
     """「時刻 + BGM」を紐づけた 1 つのセット。複数ストックできる。"""
@@ -78,6 +118,8 @@ class Schedule:
     fade_in_seconds: int = 0
     # スリープタイマー（分）。None は無効。既定は 60 分。
     sleep_timer_minutes: int | None = 60
+    # この時刻に合わせて実行する SwitchBot 操作（エアコン OFF 等）。
+    switchbot_actions: list[SwitchBotAction] = dataclasses.field(default_factory=list)
 
     @staticmethod
     def _coerce_int(value, field: str, allow_none: bool) -> int | None:
@@ -123,6 +165,8 @@ class Schedule:
             raise ValueError(
                 "sleep_timer_minutes は 1 以上、無効にする場合は null にしてください。"
             )
+        for action in self.switchbot_actions:
+            action.validate()
 
     @property
     def hour(self) -> int:
@@ -142,6 +186,7 @@ class Schedule:
             "volume": self.volume,
             "fade_in_seconds": self.fade_in_seconds,
             "sleep_timer_minutes": self.sleep_timer_minutes,
+            "switchbot_actions": [a.to_dict() for a in self.switchbot_actions],
         }
 
     @classmethod
@@ -154,6 +199,11 @@ class Schedule:
             volume=data.get("volume", 18),
             fade_in_seconds=data.get("fade_in_seconds", 0),
             sleep_timer_minutes=data.get("sleep_timer_minutes", 60),
+            switchbot_actions=[
+                SwitchBotAction.from_dict(a)
+                for a in data.get("switchbot_actions", [])
+                if isinstance(a, dict)
+            ],
         )
         if data.get("id"):
             kwargs["id"] = data["id"]
@@ -166,6 +216,13 @@ class AppSettings:
 
     room: str | None = None  # 再生元の Sonos 部屋名（例: 主書斎）
     timezone: str = "Asia/Tokyo"
+    # SwitchBot API v1.1 の認証情報（アプリの開発者向けオプションで取得）。
+    switchbot_token: str | None = None
+    switchbot_secret: str | None = None
+
+    @property
+    def switchbot_configured(self) -> bool:
+        return bool(self.switchbot_token and self.switchbot_secret)
 
     def validate(self) -> None:
         # 不正な timezone を保存するとスケジューラが次回起動できなくなるため、
@@ -178,11 +235,18 @@ class AppSettings:
             ) from exc
 
     def to_dict(self) -> dict:
-        return {"room": self.room, "timezone": self.timezone}
+        return {
+            "room": self.room,
+            "timezone": self.timezone,
+            "switchbot_token": self.switchbot_token,
+            "switchbot_secret": self.switchbot_secret,
+        }
 
     @classmethod
     def from_dict(cls, data: dict) -> "AppSettings":
         return cls(
             room=data.get("room"),
             timezone=data.get("timezone", "Asia/Tokyo"),
+            switchbot_token=data.get("switchbot_token"),
+            switchbot_secret=data.get("switchbot_secret"),
         )
